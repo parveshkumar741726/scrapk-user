@@ -6,8 +6,12 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { API_BASE } from '../config';
+import { useTheme } from '../context/ThemeContext';
 
 export default function OTPScreen({ route, navigation }) {
+    const { colors, isDarkMode } = useTheme();
+    const s = getStyles(colors, isDarkMode);
+    
     const { phone, devOtp } = route.params;
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
@@ -78,29 +82,29 @@ export default function OTPScreen({ route, navigation }) {
     );
 }
 
-const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' },
+const getStyles = (colors, isDark) => StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
     blob: {
-        width: 400, height: 400, borderRadius: 200, backgroundColor: '#16a34a',
-        position: 'absolute', top: -150, opacity: 0.08,
+        width: 400, height: 400, borderRadius: 200, backgroundColor: colors.primary,
+        position: 'absolute', top: -150, opacity: isDark ? 0.05 : 0.08,
     },
-    card: { width: '88%', backgroundColor: '#fff', borderRadius: 24, padding: 28, alignItems: 'center', elevation: 8, shadowColor: '#16a34a', shadowOpacity: 0.15, shadowRadius: 20 },
+    card: { width: '88%', backgroundColor: colors.card, borderRadius: 24, padding: 28, alignItems: 'center', elevation: 8, shadowColor: colors.primary, shadowOpacity: 0.15, shadowRadius: 20 },
     icon: { fontSize: 48, marginBottom: 8 },
-    title: { fontSize: 24, fontWeight: '800', color: '#14532d' },
-    sub: { fontSize: 13, color: '#6b7280', marginBottom: 20 },
-    devBox: { backgroundColor: '#fef9c3', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 },
-    devTxt: { color: '#854d0e', fontWeight: '700', fontSize: 13 },
+    title: { fontSize: 24, fontWeight: '800', color: colors.text },
+    sub: { fontSize: 13, color: colors.subText, marginBottom: 20 },
+    devBox: { backgroundColor: isDark ? '#422006' : '#fef9c3', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 },
+    devTxt: { color: isDark ? '#fef08a' : '#854d0e', fontWeight: '700', fontSize: 13 },
     otpRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
     box: {
-        width: 46, height: 54, borderRadius: 12, borderWidth: 2, borderColor: '#d1fae5',
-        textAlign: 'center', fontSize: 22, fontWeight: '700', color: '#111827',
-        backgroundColor: '#f0fdf4',
+        width: 46, height: 54, borderRadius: 12, borderWidth: 2, borderColor: colors.inputBorder,
+        textAlign: 'center', fontSize: 22, fontWeight: '700', color: colors.text,
+        backgroundColor: colors.inputBg,
     },
-    boxFilled: { borderColor: '#16a34a', backgroundColor: '#dcfce7' },
+    boxFilled: { borderColor: colors.primary, backgroundColor: colors.iconBg },
     btn: {
         width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center',
-        backgroundColor: '#16a34a', elevation: 6, shadowColor: '#16a34a', shadowOpacity: 0.35, shadowRadius: 8,
+        backgroundColor: colors.primary, elevation: 6, shadowColor: colors.primary, shadowOpacity: 0.35, shadowRadius: 8,
     },
     btnTxt: { color: '#fff', fontWeight: '800', fontSize: 16 },
-    back: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
+    back: { color: colors.primary, fontWeight: '600', fontSize: 14 },
 });

@@ -1,15 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    ActivityIndicator, RefreshControl, Alert, Modal, TextInput,
+    ActivityIndicator, RefreshControl, Alert, Modal, Image, Dimensions, ScrollView
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE } from '../config';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
+
+const { width } = Dimensions.get('window');
 
 const STATUS_COLOR = {
-    open: '#16a34a', pending: '#f59e0b', accepted: '#3b82f6',
-    confirmed: '#8b5cf6', completed: '#10b981', cancelled: '#ef4444',
+    open: '#10b981', 
+    bidding: '#3b82f6', 
+    accepted: '#8b5cf6', 
+    booked: '#6366f1', 
+    completed: '#10b981', 
+    cancelled: '#ef4444',
 };
 
 const SLOT_LABELS = {
@@ -22,18 +32,20 @@ const formatDate = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
     if (isNaN(dt)) return String(d);
-    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-        .replace(/-/g, ' ');
+    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const formatSlot = (slot) => SLOT_LABELS[slot] || slot || '—';
 
 export default function MySalesScreen({ navigation }) {
+    const { colors, isDarkMode } = useTheme();
+    const { t } = useLanguage();
+    const s = getStyles(colors, isDarkMode);
+
     const [sales, setSales] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [bidModal, setBidModal] = useState(null); // { sale, bids }
-    const [bidLoading, setBidLoading] = useState(false);
+    const [detailModal, setDetailModal] = useState(null);
 
     const getH = async () => {
         const t = await SecureStore.getItemAsync('token');
@@ -52,42 +64,14 @@ export default function MySalesScreen({ navigation }) {
     const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, []);
     useEffect(() => { load(); }, []);
 
-    const viewBids = async (sale) => {
-        setBidLoading(true);
-        try {
-            const h = await getH();
-            const res = await axios.get(`${API_BASE}/bids?saleId=${sale._id}`, h);
-            setBidModal({ sale, bids: res.data.data || [] });
-        } catch (_) { Alert.alert('Error', 'Could not load bids.'); }
-        finally { setBidLoading(false); }
-    };
-
-    const acceptBid = async (bidId, saleId) => {
-        Alert.alert('Accept Bid?', 'This vendor will be confirmed for your pickup.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Accept ✓', style: 'default',
-                onPress: async () => {
-                    try {
-                        const h = await getH();
-                        await axios.patch(`${API_BASE}/bids/${bidId}/accept`, {}, h);
-                        Alert.alert('🎉 Bid Accepted!', 'Booking confirmed. Track your pickup in My Sales.');
-                        setBidModal(null);
-                        load();
-                    } catch (e) { Alert.alert('Error', e.response?.data?.message || 'Failed to accept bid.'); }
-                },
-            },
-        ]);
-    };
-
     const cancelSale = (saleId) => {
         Alert.alert(
             '❌ Cancel Sale',
-            'Sale cancel ho jayegi aur sare bids hata diye jayenge. Confirm?',
+            'Are you sure you want to cancel this request?',
             [
-                { text: 'Nahi', style: 'cancel' },
+                { text: 'No', style: 'cancel' },
                 {
-                    text: 'Haan, Cancel Karo', style: 'destructive',
+                    text: 'Yes, Cancel', style: 'destructive',
                     onPress: async () => {
                         try {
                             const h = await getH();
@@ -102,100 +86,174 @@ export default function MySalesScreen({ navigation }) {
         );
     };
 
-
+    if (loading && !refreshing) {
+        return (
+            <View style={s.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={s.root}>
-            <View style={s.header}>
-                <Text style={s.title}>📦 My Sales</Text>
-                <TouchableOpacity style={s.addBtn} onPress={() => navigation.navigate('CreateSale')}>
-                    <Text style={s.addTxt}>+ New Sale</Text>
-                </TouchableOpacity>
-            </View>
+            {/* Premium Header */}
+            <LinearGradient
+                colors={isDarkMode ? ['#064e3b', '#0a1910'] : ['#16a34a', '#10b981']}
+                style={s.header}
+            >
+                <View style={s.headerTop}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+                        <MaterialCommunityIcons name="chevron-left" size={32} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={s.headerTitle}>{t.mySales}</Text>
+                    <TouchableOpacity style={s.addBtn} onPress={() => navigation.navigate('CreateSale')}>
+                        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            </LinearGradient>
 
             <FlatList
                 data={sales}
                 keyExtractor={i => i._id}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" />}
-                contentContainerStyle={{ padding: 16, gap: 12 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+                contentContainerStyle={s.list}
                 ListEmptyComponent={
                     <View style={s.empty}>
-                        <Text style={s.emptyIcon}>📭</Text>
-                        <Text style={s.emptyTxt}>No sales yet!</Text>
+                        <LinearGradient colors={[colors.primary + '20', colors.primary + '05']} style={s.emptyIconBg}>
+                            <MaterialCommunityIcons name="package-variant" size={60} color={colors.primary} />
+                        </LinearGradient>
+                        <Text style={s.emptyTxt}>No active sales found</Text>
                         <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('CreateSale')}>
-                            <Text style={s.emptyBtnTxt}>+ Post Your First Sale</Text>
+                            <Text style={s.emptyBtnTxt}>Post New Sale</Text>
                         </TouchableOpacity>
                     </View>
                 }
-                renderItem={({ item: sale }) => (
-                    <View style={s.card}>
-                        <View style={s.cardTop}>
-                            <View>
-                                <Text style={s.cardCategory}>{sale.categoryId?.name || 'Scrap'}</Text>
-                                <Text style={s.cardQty}>~{sale.estimatedQuantity ?? sale.estimatedQty ?? '?'} kg</Text>
-                            </View>
-                            <View style={[s.badge, { backgroundColor: (STATUS_COLOR[sale.status] || '#6b7280') + '20' }]}>
-                                <Text style={[s.badgeTxt, { color: STATUS_COLOR[sale.status] || '#6b7280' }]}>
-                                    {sale.status?.toUpperCase()}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <Text style={s.cardDate}>📅 {formatDate(sale.scheduledDate)} · {formatSlot(sale.scheduledSlot)}</Text>
-                        {sale.pickupAddress ? <Text style={s.cardAddr} numberOfLines={1}>📍 {sale.pickupAddress}</Text> : null}
-
-                        <View style={s.cardActions}>
-                            {sale.status === 'open' && (
-                                <TouchableOpacity style={s.bidBtn} onPress={() => viewBids(sale)} disabled={bidLoading}>
-                                    <Text style={s.bidBtnTxt}>👀 View Bids ({sale.bidCount || 0})</Text>
-                                </TouchableOpacity>
-                            )}
-                            {sale.status === 'open' && (
-                                <TouchableOpacity style={s.cancelBtn} onPress={() => cancelSale(sale._id)}>
-                                    <Text style={s.cancelBtnTxt}>❌ Cancel</Text>
-                                </TouchableOpacity>
-                            )}
-                            {['confirmed', 'in_progress'].includes(sale.status) && (
-                                <TouchableOpacity style={s.trackBtn} onPress={() => navigation.navigate('Tracking', { sale })}>
-                                    <Text style={s.trackBtnTxt}>🗺️ Track Pickup</Text>
-                                </TouchableOpacity>
-                            )}
-                            {sale.status === 'completed' && (
-                                <TouchableOpacity style={s.rateBtn} onPress={() => navigation.navigate('Feedback', { saleId: sale._id })}>
-                                    <Text style={s.rateBtnTxt}>⭐ Rate Experience</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    </View>
-                )}
-            />
-
-            {/* Bid Modal */}
-            <Modal visible={!!bidModal} animationType="slide" transparent>
-                <View style={s.modalBg}>
-                    <View style={s.modalCard}>
-                        <Text style={s.modalTitle}>💰 Bids Received</Text>
-                        <Text style={s.modalSub}>Sale: {bidModal?.sale?.categoryId?.name} · {bidModal?.sale?.estimatedQuantity ?? bidModal?.sale?.estimatedQty ?? '?'}kg</Text>
-                        {bidModal?.bids?.length === 0
-                            ? <Text style={{ textAlign: 'center', color: '#6b7280', marginTop: 20 }}>No bids yet. Check back soon!</Text>
-                            : bidModal?.bids?.map(bid => (
-                                <View key={bid._id} style={s.bidRow}>
-                                    <View>
-                                        <Text style={s.bidVendor}>{bid.vendorId?.shopName || bid.vendorId?.name || 'Vendor'}</Text>
-                                        <Text style={s.bidNote}>{bid.note || ''}</Text>
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
-                                        <Text style={s.bidAmt}>₹{bid.bidAmount}/kg</Text>
-                                        <TouchableOpacity style={s.acceptBtn} onPress={() => acceptBid(bid._id, bid.saleId)}>
-                                            <Text style={s.acceptTxt}>Accept</Text>
-                                        </TouchableOpacity>
+                renderItem={({ item: sale }) => {
+                    const firstImage = sale.images?.[0];
+                    const statusClr = STATUS_COLOR[sale.status] || '#6b7280';
+                    return (
+                        <TouchableOpacity 
+                            style={[s.card, { backgroundColor: colors.card }]} 
+                            activeOpacity={0.9} 
+                            onPress={() => setDetailModal(sale)}
+                        >
+                            <View style={s.cardInner}>
+                                <View style={s.imgContainer}>
+                                    {firstImage ? (
+                                        <Image source={{ uri: firstImage }} style={s.cardImg} />
+                                    ) : (
+                                        <View style={[s.cardImg, s.placeholderImg]}>
+                                            <MaterialCommunityIcons name="camera-off" size={30} color={colors.subText} />
+                                        </View>
+                                    )}
+                                    <View style={[s.badge, { backgroundColor: statusClr }]}>
+                                        <Text style={s.badgeText}>{sale.status?.toUpperCase()}</Text>
                                     </View>
                                 </View>
-                            ))
-                        }
-                        <TouchableOpacity style={s.closeBtn} onPress={() => setBidModal(null)}>
-                            <Text style={s.closeBtnTxt}>Close</Text>
+
+                                <View style={s.cardBody}>
+                                    <Text style={s.categoryName} numberOfLines={1}>
+                                        {sale.categories?.map(c => c.name).join(', ') || 'Scrap Sale'}
+                                    </Text>
+                                    
+                                    <View style={s.infoRow}>
+                                        <MaterialCommunityIcons name="weight-kilogram" size={14} color={colors.primary} />
+                                        <Text style={s.infoText}>{sale.estimatedQuantity ?? '?'} kg</Text>
+                                    </View>
+                                    
+                                    <View style={s.infoRow}>
+                                        <MaterialCommunityIcons name="calendar-clock" size={14} color={colors.subText} />
+                                        <Text style={s.infoText}>{formatDate(sale.scheduledDate)}</Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <MaterialCommunityIcons name="map-marker-outline" size={14} color={colors.subText} />
+                                        <Text style={s.infoText} numberOfLines={1}>{sale.city || 'Location N/A'}</Text>
+                                    </View>
+                                </View>
+                                
+                                <View style={s.arrowBtn}>
+                                    <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
+                                </View>
+                            </View>
                         </TouchableOpacity>
+                    );
+                }}
+            />
+
+            {/* Detail Modal Redesign */}
+            <Modal visible={!!detailModal} animationType="fade" transparent>
+                <View style={s.modalOverlay}>
+                    <View style={[s.modalContent, { backgroundColor: colors.card }]}>
+                        {detailModal && (
+                            <>
+                                <View style={s.modalHeader}>
+                                    <Text style={s.modalHeaderTitle}>Sale Details</Text>
+                                    <TouchableOpacity onPress={() => setDetailModal(null)}>
+                                        <MaterialCommunityIcons name="close" size={24} color={colors.text} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.modalScroll}>
+                                    {detailModal.images?.length > 0 ? (
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.modalGallery}>
+                                            {detailModal.images.map((img, idx) => (
+                                                <Image key={idx} source={{ uri: img }} style={s.modalImg} />
+                                            ))}
+                                        </ScrollView>
+                                    ) : (
+                                        <View style={s.modalNoImg}>
+                                            <MaterialCommunityIcons name="image-off-outline" size={50} color={colors.subText} />
+                                            <Text style={{ color: colors.subText, marginTop: 10 }}>No images attached</Text>
+                                        </View>
+                                    )}
+
+                                    <Text style={s.modalCategory}>
+                                        {detailModal.categories?.map(c => c.name).join(', ') || 'Scrap Items'}
+                                    </Text>
+
+                                    <View style={s.detailGrid}>
+                                        <DetailItem icon="scale" label="Estimated Qty" value={`${detailModal.estimatedQuantity || '?'} kg`} colors={colors} s={s} />
+                                        <DetailItem icon="calendar-outline" label="Pickup Date" value={formatDate(detailModal.scheduledDate)} colors={colors} s={s} />
+                                        <DetailItem icon="clock-outline" label="Time Slot" value={formatSlot(detailModal.scheduledSlot)} colors={colors} s={s} />
+                                        <DetailItem icon="map-marker-radius" label="City" value={detailModal.city || 'N/A'} colors={colors} s={s} />
+                                    </View>
+
+                                    <View style={s.addressBlock}>
+                                        <Text style={s.addressLabel}>Pickup Address</Text>
+                                        <Text style={s.addressContent}>{detailModal.pickupAddress}</Text>
+                                    </View>
+
+                                    {detailModal.notes && (
+                                        <View style={s.addressBlock}>
+                                            <Text style={s.addressLabel}>Additional Notes</Text>
+                                            <Text style={s.addressContent}>{detailModal.notes}</Text>
+                                        </View>
+                                    )}
+
+                                    <View style={s.modalActionRow}>
+                                        {['open', 'booked'].includes(detailModal.status) && (
+                                            <TouchableOpacity style={s.modalCancelBtn} onPress={() => { setDetailModal(null); cancelSale(detailModal._id); }}>
+                                                <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ef4444" />
+                                                <Text style={s.modalCancelText}>Cancel Pickup</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {['confirmed', 'in_progress'].includes(detailModal.status) && (
+                                            <TouchableOpacity style={s.modalTrackBtn} onPress={() => { setDetailModal(null); navigation.navigate('Tracking', { sale: detailModal }); }}>
+                                                <MaterialCommunityIcons name="map-marker-path" size={20} color="#fff" />
+                                                <Text style={s.modalTrackText}>Track Pickup</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {detailModal.status === 'completed' && (
+                                            <TouchableOpacity style={s.modalRateBtn} onPress={() => { setDetailModal(null); navigation.navigate('Feedback', { saleId: detailModal._id }); }}>
+                                                <MaterialCommunityIcons name="star-outline" size={20} color="#fff" />
+                                                <Text style={s.modalRateText}>Rate Experience</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </ScrollView>
+                            </>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -203,45 +261,141 @@ export default function MySalesScreen({ navigation }) {
     );
 }
 
-const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#f0fdf4' },
-    center: { flex: 1, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#fff', elevation: 2 },
-    title: { fontSize: 20, fontWeight: '800', color: '#14532d' },
-    addBtn: { backgroundColor: '#16a34a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-    addTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
-    card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 2, shadowColor: '#16a34a', shadowOpacity: 0.08, shadowRadius: 8 },
-    cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-    cardCategory: { fontSize: 16, fontWeight: '800', color: '#14532d' },
-    cardQty: { fontSize: 13, color: '#4b7c58', fontWeight: '600' },
-    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-    badgeTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-    cardDate: { fontSize: 12, color: '#6b7280', marginBottom: 2 },
-    cardAddr: { fontSize: 12, color: '#6b7280', marginBottom: 10 },
-    cardActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-    bidBtn: { backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#86efac' },
-    bidBtnTxt: { color: '#16a34a', fontWeight: '700', fontSize: 13 },
-    trackBtn: { backgroundColor: '#dbeafe', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#93c5fd' },
-    trackBtnTxt: { color: '#1d4ed8', fontWeight: '700', fontSize: 13 },
-    rateBtn: { backgroundColor: '#fef9c3', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#fde68a' },
-    rateBtnTxt: { color: '#b45309', fontWeight: '700', fontSize: 13 },
-    empty: { alignItems: 'center', marginTop: 80 },
-    emptyIcon: { fontSize: 60, marginBottom: 12 },
-    emptyTxt: { fontSize: 18, fontWeight: '700', color: '#374151', marginBottom: 16 },
-    emptyBtn: { backgroundColor: '#16a34a', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12 },
-    emptyBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-    modalBg: { flex: 1, backgroundColor: '#00000055', justifyContent: 'flex-end' },
-    modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '70%' },
-    modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d', marginBottom: 4 },
-    modalSub: { fontSize: 13, color: '#6b7280', marginBottom: 16 },
-    bidRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f0fdf4', borderRadius: 12, padding: 14, marginBottom: 10 },
-    bidVendor: { fontSize: 14, fontWeight: '700', color: '#111827' },
-    bidNote: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-    bidAmt: { fontSize: 16, fontWeight: '800', color: '#16a34a', marginBottom: 6 },
-    acceptBtn: { backgroundColor: '#16a34a', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-    acceptTxt: { color: '#fff', fontWeight: '700', fontSize: 12 },
-    closeBtn: { backgroundColor: '#f0fdf4', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
-    closeBtnTxt: { color: '#16a34a', fontWeight: '700', fontSize: 15 },
-    cancelBtn: { backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#fca5a5' },
-    cancelBtnTxt: { color: '#dc2626', fontWeight: '700', fontSize: 13 },
+const DetailItem = ({ icon, label, value, colors, s }) => (
+    <View style={s.gridItem}>
+        <View style={s.gridIcon}>
+            <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />
+        </View>
+        <View>
+            <Text style={s.gridLabel}>{label}</Text>
+            <Text style={s.gridValue}>{value}</Text>
+        </View>
+    </View>
+);
+
+const s = StyleSheet.create({}); // Placeholder to satisfy compiler, replaced below
+
+const getStyles = (colors, isDark) => StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+    header: {
+        paddingTop: 56,
+        paddingBottom: 24,
+        paddingHorizontal: 20,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
+    addBtn: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    list: { padding: 20, paddingBottom: 40 },
+    card: {
+        borderRadius: 24,
+        marginBottom: 16,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+    },
+    cardInner: { flexDirection: 'row', padding: 12, alignItems: 'center' },
+    imgContainer: { position: 'relative' },
+    cardImg: { width: 90, height: 90, borderRadius: 16 },
+    placeholderImg: { backgroundColor: colors.inputBg, alignItems: 'center', justifyContent: 'center' },
+    badge: {
+        position: 'absolute', top: -5, left: -5,
+        paddingHorizontal: 8, paddingVertical: 4,
+        borderRadius: 8, elevation: 2,
+    },
+    badgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
+    cardBody: { flex: 1, marginLeft: 16, justifyContent: 'center' },
+    categoryName: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 6 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+    infoText: { fontSize: 12, color: colors.subText, fontWeight: '600' },
+    arrowBtn: { padding: 4 },
+    
+    empty: { alignItems: 'center', marginTop: 100 },
+    emptyIconBg: {
+        width: 120, height: 120, borderRadius: 60,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+    },
+    emptyTxt: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 12 },
+    emptyBtn: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 30, paddingVertical: 14,
+        borderRadius: 16, elevation: 3,
+    },
+    emptyBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    modalContent: {
+        borderTopLeftRadius: 40, borderTopRightRadius: 40,
+        maxHeight: '85%', paddingHorizontal: 24, paddingBottom: 34,
+    },
+    modalHeader: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', paddingVertical: 24,
+        borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    modalHeaderTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+    modalScroll: { paddingTop: 20 },
+    modalGallery: { marginBottom: 20 },
+    modalImg: { width: 280, height: 180, borderRadius: 24, marginRight: 12 },
+    modalNoImg: {
+        width: '100%', height: 150, borderRadius: 24,
+        backgroundColor: colors.inputBg, borderStyle: 'dashed', borderWidth: 2, borderColor: colors.border,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+    },
+    modalCategory: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 24 },
+    detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 24 },
+    gridItem: {
+        width: (width - 64) / 2, flexDirection: 'row',
+        alignItems: 'center', gap: 10,
+    },
+    gridIcon: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: colors.iconBg, alignItems: 'center', justifyContent: 'center',
+    },
+    gridLabel: { fontSize: 10, color: colors.subText, fontWeight: '700', textTransform: 'uppercase' },
+    gridValue: { fontSize: 14, fontWeight: '700', color: colors.text },
+
+    addressBlock: {
+        backgroundColor: colors.inputBg, borderRadius: 20,
+        padding: 16, marginBottom: 20,
+    },
+    addressLabel: { fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 6 },
+    addressContent: { fontSize: 14, color: colors.text, lineHeight: 20 },
+
+    modalActionRow: { marginTop: 10, gap: 12 },
+    modalCancelBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 10, paddingVertical: 16, borderRadius: 18,
+        borderWidth: 1.5, borderColor: '#ef4444',
+    },
+    modalCancelText: { color: '#ef4444', fontWeight: '800', fontSize: 15 },
+    modalTrackBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 10, paddingVertical: 16, borderRadius: 18,
+        backgroundColor: colors.primary, elevation: 3,
+    },
+    modalTrackText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+    modalRateBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 10, paddingVertical: 16, borderRadius: 18,
+        backgroundColor: '#f59e0b', elevation: 3,
+    },
+    modalRateText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
+

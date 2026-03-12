@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
+    ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Image
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE } from '../config';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LoginScreen({ navigation }) {
+    const { colors, isDarkMode } = useTheme();
+    const s = getStyles(colors, isDarkMode);
+    
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -29,8 +33,8 @@ export default function LoginScreen({ navigation }) {
                 <View style={s.headerBlob} />
 
                 <View style={s.card}>
-                    <Text style={s.emoji}>♻️</Text>
-                    <Text style={s.title}>ScrapBazaar</Text>
+                    <Image source={require('../../assets/icon.png')} style={s.logoImg} resizeMode="contain" />
+                    <Text style={s.title}>ScrapK</Text>
                     <Text style={s.sub}>India ka sabse bada scrap marketplace</Text>
 
                     <View style={s.inputWrap}>
@@ -67,39 +71,39 @@ export default function LoginScreen({ navigation }) {
     );
 }
 
-const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#f0fdf4' },
+const getStyles = (colors, isDark) => StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
     scroll: { flexGrow: 1, alignItems: 'center', paddingBottom: 40 },
     headerBlob: {
-        width: '200%', height: 300, backgroundColor: '#16a34a',
+        width: '200%', height: 300, backgroundColor: colors.primary,
         borderBottomLeftRadius: 300, borderBottomRightRadius: 300,
         position: 'absolute', top: -80, alignSelf: 'center',
-        opacity: 0.12,
+        opacity: isDark ? 0.05 : 0.12,
     },
     card: {
-        width: '90%', backgroundColor: '#fff', borderRadius: 24,
+        width: '90%', backgroundColor: colors.card, borderRadius: 24,
         padding: 28, marginTop: 100, alignItems: 'center',
-        shadowColor: '#16a34a', shadowOpacity: 0.15, shadowRadius: 20,
+        shadowColor: colors.primary, shadowOpacity: 0.15, shadowRadius: 20,
         elevation: 8,
     },
-    emoji: { fontSize: 56, marginBottom: 8 },
-    title: { fontSize: 30, fontWeight: '800', color: '#14532d', letterSpacing: 0.5 },
-    sub: { fontSize: 13, color: '#4b7c58', marginBottom: 28, textAlign: 'center' },
+    logoImg: { width: 70, height: 70, marginBottom: 8, borderRadius: 16 },
+    title: { fontSize: 30, fontWeight: '800', color: colors.text, letterSpacing: 0.5 },
+    sub: { fontSize: 13, color: colors.subText, marginBottom: 28, textAlign: 'center' },
     inputWrap: {
         flexDirection: 'row', alignItems: 'center', width: '100%',
-        backgroundColor: '#f0fdf4', borderRadius: 14, paddingHorizontal: 14,
-        borderWidth: 1.5, borderColor: '#bbf7d0', marginBottom: 16,
+        backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14,
+        borderWidth: 1.5, borderColor: colors.inputBorder, marginBottom: 16,
     },
-    prefix: { fontSize: 15, fontWeight: '600', color: '#166534', marginRight: 8 },
-    input: { flex: 1, paddingVertical: 14, fontSize: 17, color: '#111827', letterSpacing: 1 },
+    prefix: { fontSize: 15, fontWeight: '600', color: colors.primary, marginRight: 8 },
+    input: { flex: 1, paddingVertical: 14, fontSize: 17, color: colors.text, letterSpacing: 1 },
     btn: {
         width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center',
-        backgroundColor: '#16a34a', marginBottom: 12,
-        shadowColor: '#16a34a', shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
+        backgroundColor: colors.primary, marginBottom: 12,
+        shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
     },
     btnTxt: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
-    disclaimer: { fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: 4 },
+    disclaimer: { fontSize: 11, color: colors.subText, textAlign: 'center', marginTop: 4 },
     features: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 28, paddingHorizontal: 16 },
-    featureChip: { backgroundColor: '#dcfce7', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-    featureTxt: { color: '#15803d', fontWeight: '600', fontSize: 12 },
+    featureChip: { backgroundColor: colors.iconBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+    featureTxt: { color: colors.primary, fontWeight: '600', fontSize: 12 },
 });

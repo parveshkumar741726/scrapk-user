@@ -1,22 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    RefreshControl, Alert,
+    RefreshControl, Alert, Image, Dimensions,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE } from '../config';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
-const QUICK_ACTIONS = [
-    { icon: '📦', label: 'Sell Scrap', screen: 'CreateSale', color: '#dcfce7', border: '#86efac' },
-    { icon: '📋', label: 'My Sales', screen: 'MySales', color: '#dbeafe', border: '#93c5fd' },
-    { icon: '🛒', label: 'Kabadi Bazar', screen: 'Bazaar', color: '#fef9c3', border: '#fde68a' },
-    { icon: '🎯', label: 'Track Pickup', screen: 'MySales', color: '#fce7f3', border: '#f9a8d4' },
-    { icon: '🗣️', label: 'Complaint', screen: 'Complaints', color: '#f3e8ff', border: '#c4b5fd' },
-    { icon: '⭐', label: 'Give Feedback', screen: 'Feedback', color: '#fff7ed', border: '#fed7aa' },
+const { width } = Dimensions.get('window');
+
+const QUICK_ACTIONS = (isDark, colors, t) => [
+    { icon: 'plus-circle-outline', label: t.sellScrap, screen: 'CreateSale', color: '#10b981' },
+    { icon: 'format-list-bulleted', label: t.mySales, screen: 'MySales', color: '#3b82f6' },
+    { icon: 'storefront-outline', label: t.bazar, screen: 'Bazaar', color: '#f59e0b' },
+    { icon: 'map-marker-radius-outline', label: t.track, screen: 'MySales', color: '#ec4899' },
+    { icon: 'comment-alert-outline', label: t.complaint, screen: 'Complaints', color: '#8b5cf6' },
+    { icon: 'star-face', label: t.feedback, screen: 'Feedback', color: '#ef4444' },
 ];
 
 export default function HomeScreen({ navigation }) {
+    const { colors, isDarkMode } = useTheme();
+    const { t } = useLanguage();
+    const s = getStyles(colors, isDarkMode);
+
     const [user, setUser] = useState(null);
     const [stats, setStats] = useState({ sales: 0, completed: 0 });
     const [refreshing, setRefreshing] = useState(false);
@@ -36,98 +46,274 @@ export default function HomeScreen({ navigation }) {
     const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
     const hour = new Date().getHours();
-    const greeting = hour < 12 ? '🌅 Good Morning' : hour < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening';
+    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
     return (
-        <ScrollView style={s.root} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" />} showsVerticalScrollIndicator={false}>
-            {/* Header */}
-            <View style={s.header}>
-                <View style={s.headerBlob} />
-                <View style={s.headerContent}>
-                    <Text style={s.greeting}>{greeting}</Text>
-                    <Text style={s.name}>{user?.name || user?.phone || 'Customer'} 👋</Text>
-                    <Text style={s.tagline}>Turn your scrap into cash today!</Text>
-                </View>
+        <View style={s.root}>
+            <ScrollView 
+                style={{ flex: 1 }} 
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />} 
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Header Section */}
+                <LinearGradient
+                    colors={isDarkMode ? ['#064e3b', '#0a1910'] : ['#16a34a', '#f0fdf4']}
+                    style={s.header}
+                >
+                    <View style={s.topBar}>
+                        <View>
+                            <Text style={s.greetingText}>{greeting}</Text>
+                            <Text style={s.userName}>{user?.name || user?.phone || 'Customer'}</Text>
+                        </View>
+                        <TouchableOpacity 
+                            style={s.profileThumb}
+                            onPress={() => navigation.navigate('Profile')}
+                        >
+                            {user?.profileImage ? (
+                                <Image source={{ uri: user.profileImage }} style={s.avatarImg} />
+                            ) : (
+                                <View style={s.avatarLabel}>
+                                    <Text style={s.avatarText}>{(user?.name || 'C')[0]}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
-                {/* Stats row */}
-                <View style={s.statsRow}>
-                    <View style={s.statBox}>
-                        <Text style={s.statNum}>{stats.sales}</Text>
-                        <Text style={s.statLbl}>Total Sales</Text>
+                    {/* Floating Stats Card */}
+                    <View style={s.statsCard}>
+                        <View style={s.statItem}>
+                            <View style={[s.statIcon, { backgroundColor: '#dcfce7' }]}>
+                                <MaterialCommunityIcons name="package-variant" size={20} color="#059669" />
+                            </View>
+                            <View>
+                                <Text style={s.statValue}>{stats.sales}</Text>
+                                <Text style={s.statLabel}>{t.mySales}</Text>
+                            </View>
+                        </View>
+                        <View style={s.divider} />
+                        <View style={s.statItem}>
+                            <View style={[s.statIcon, { backgroundColor: '#fef3c7' }]}>
+                                <MaterialCommunityIcons name="check-decagram" size={20} color="#d97706" />
+                            </View>
+                            <View>
+                                <Text style={s.statValue}>{stats.completed}</Text>
+                                <Text style={s.statLabel}>{t.pickups}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={s.statDiv} />
-                    <View style={s.statBox}>
-                        <Text style={s.statNum}>{stats.completed}</Text>
-                        <Text style={s.statLbl}>Completed</Text>
-                    </View>
-                    <View style={s.statDiv} />
-                    <View style={s.statBox}>
-                        <Text style={s.statNum}>₹0</Text>
-                        <Text style={s.statLbl}>Earned</Text>
-                    </View>
-                </View>
-            </View>
+                </LinearGradient>
 
-            {/* Quick actions */}
-            <Text style={s.sectionTitle}>What do you want to do?</Text>
-            <View style={s.grid}>
-                {QUICK_ACTIONS.map(a => (
-                    <TouchableOpacity
-                        key={a.label}
-                        style={[s.card, { backgroundColor: a.color, borderColor: a.border }]}
-                        onPress={() => navigation.navigate(a.screen)}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={s.cardIcon}>{a.icon}</Text>
-                        <Text style={s.cardLabel}>{a.label}</Text>
+                <View style={s.content}>
+                    <Text style={s.sectionTitle}>{t.liveStats || 'Quick Navigation'}</Text>
+                    
+                    <View style={s.actionGrid}>
+                        {QUICK_ACTIONS(isDarkMode, colors, t).map((action, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                activeOpacity={0.7}
+                                style={[s.actionItem, { backgroundColor: isDarkMode ? '#102e1c' : '#fff' }]}
+                                onPress={() => navigation.navigate(action.screen)}
+                            >
+                                <LinearGradient
+                                    colors={[action.color + '20', action.color + '05']}
+                                    style={s.actionIconBg}
+                                >
+                                    <MaterialCommunityIcons name={action.icon} size={28} color={action.color} />
+                                </LinearGradient>
+                                <Text style={s.actionLabel}>{action.label}</Text>
+                                <View style={[s.actionIndicator, { backgroundColor: action.color }]} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* Promo Banner */}
+                    <TouchableOpacity activeOpacity={0.9} style={s.promoBanner}>
+                        <LinearGradient
+                            colors={['#10b981', '#059669']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={s.promoGradient}
+                        >
+                            <View style={s.promoTextContent}>
+                                <Text style={s.promoTitle}>♻️ ScrapK Promise</Text>
+                                <Text style={s.promoSub}>Instant Payment • Doorstep Pickup • Best Price</Text>
+                            </View>
+                            <MaterialCommunityIcons name="shield-check-outline" size={40} color="#fff" style={{ opacity: 0.3 }} />
+                        </LinearGradient>
                     </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Banner */}
-            <View style={s.banner}>
-                <Text style={s.bannerTitle}>♻️ ScrapBazaar Promise</Text>
-                <Text style={s.bannerSub}>Best price guaranteed • Doorstep pickup • Instant payment</Text>
-            </View>
-
-            <View style={{ height: 30 }} />
-        </ScrollView>
+                </View>
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </View>
     );
 }
 
-const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#f0fdf4' },
-    header: { paddingTop: 52, paddingBottom: 24, paddingHorizontal: 20, overflow: 'hidden' },
-    headerBlob: {
-        position: 'absolute', top: -60, left: -60, right: -60,
-        height: 280, backgroundColor: '#16a34a', borderBottomLeftRadius: 80, borderBottomRightRadius: 80,
-        opacity: 0.12,
+const getStyles = (colors, isDark) => StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
+    header: {
+        paddingTop: 60,
+        paddingBottom: 80,
+        paddingHorizontal: 24,
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
     },
-    headerContent: { marginBottom: 16 },
-    greeting: { fontSize: 13, color: '#15803d', fontWeight: '600' },
-    name: { fontSize: 22, fontWeight: '800', color: '#14532d', marginTop: 2 },
-    tagline: { fontSize: 13, color: '#4b7c58', marginTop: 4 },
-    statsRow: {
-        flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, padding: 16,
-        alignItems: 'center', justifyContent: 'space-around',
-        shadowColor: '#16a34a', shadowOpacity: 0.1, shadowRadius: 10, elevation: 4,
+    topBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 30,
     },
-    statBox: { alignItems: 'center', flex: 1 },
-    statNum: { fontSize: 22, fontWeight: '800', color: '#16a34a' },
-    statLbl: { fontSize: 11, color: '#6b7280', fontWeight: '600', marginTop: 2 },
-    statDiv: { width: 1, height: 32, backgroundColor: '#e5e7eb' },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', paddingHorizontal: 20, marginTop: 24, marginBottom: 14 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, gap: 12 },
-    card: {
-        width: '46%', borderRadius: 18, padding: 18, alignItems: 'center',
-        borderWidth: 1.5, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    greetingText: {
+        fontSize: 14,
+        color: isDark ? '#a7f3d0' : '#fff',
+        opacity: 0.9,
+        fontWeight: '600',
     },
-    cardIcon: { fontSize: 34, marginBottom: 8 },
-    cardLabel: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'center' },
-    banner: {
-        marginHorizontal: 20, marginTop: 24, backgroundColor: '#16a34a', borderRadius: 18, padding: 20,
-        shadowColor: '#16a34a', shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    userName: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: -0.5,
     },
-    bannerTitle: { fontSize: 16, fontWeight: '800', color: '#fff', marginBottom: 6 },
-    bannerSub: { fontSize: 12, color: '#dcfce7', lineHeight: 18 },
+    profileThumb: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderColor: '#fff',
+        overflow: 'hidden',
+        elevation: 8,
+    },
+    avatarImg: { width: '100%', height: '100%' },
+    avatarLabel: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#059669',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+    
+    statsCard: {
+        position: 'absolute',
+        bottom: -35,
+        left: 24,
+        right: 24,
+        height: 80,
+        backgroundColor: colors.card,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-evenly',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+    },
+    statItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    statIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.text,
+    },
+    statLabel: {
+        fontSize: 10,
+        color: colors.subText,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    divider: {
+        width: 1,
+        height: 40,
+        backgroundColor: colors.border,
+        opacity: 0.5,
+    },
+
+    content: {
+        marginTop: 60,
+        paddingHorizontal: 20,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.text,
+        marginBottom: 20,
+        marginLeft: 4,
+    },
+    actionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 16,
+    },
+    actionItem: {
+        width: (width - 56) / 2,
+        borderRadius: 24,
+        padding: 20,
+        alignItems: 'center',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    actionIconBg: {
+        width: 56,
+        height: 56,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    actionLabel: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: colors.text,
+        textAlign: 'center',
+    },
+    actionIndicator: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    
+    promoBanner: {
+        marginTop: 30,
+        borderRadius: 24,
+        overflow: 'hidden',
+        elevation: 6,
+    },
+    promoGradient: {
+        padding: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    promoTextContent: { flex: 1 },
+    promoTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    promoSub: {
+        fontSize: 12,
+        color: '#dcfce7',
+        fontWeight: '600',
+    }
 });

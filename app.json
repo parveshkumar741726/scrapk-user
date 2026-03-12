@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "ScrapBazaar Customer",
-    "slug": "scrapbazaar-customer",
+    "name": "ScrapK",
+    "slug": "scrapk-customer",
+    "icon": "./assets/icon.png",
     "version": "1.0.0",
     "sdkVersion": "52.0.0",
     "orientation": "portrait",
