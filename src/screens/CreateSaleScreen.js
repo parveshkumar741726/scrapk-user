@@ -125,7 +125,7 @@ export default function CreateSaleScreen({ navigation }) {
         setLoadingVendors(true);
         try {
             const token = await SecureStore.getItemAsync('token');
-            const res = await axios.get(`${API_BASE}/users?role=vendor&city=${city}`, {
+            const res = await axios.get(`${API_BASE}/users/vendors?city=${city}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setVendors(res.data.data || []);

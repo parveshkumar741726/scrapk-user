@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    TextInput, ActivityIndicator, Linking, Alert, Dimensions
+    TextInput, ActivityIndicator, Linking, Alert, Dimensions, Image
 } from 'react-native';
 import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE } from '../config';
@@ -17,7 +18,7 @@ export default function BazaarScreen() {
     const { t } = useLanguage();
     const s = getStyles(colors, isDarkMode);
 
-    const [vendors, setVendors] = useState([]);
+    const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
@@ -26,27 +27,81 @@ export default function BazaarScreen() {
 
     const load = async (pg = 1, reset = false) => {
         try {
-            const params = new URLSearchParams({ page: pg, limit: 10, role: 'vendor' });
+            setLoading(true);
+            const token = await SecureStore.getItemAsync('token');
+            const params = new URLSearchParams({ page: pg, limit: 10 });
             if (city) params.append('city', city);
             if (search) params.append('search', search);
-            const res = await axios.get(`${API_BASE}/users?${params}`);
+
+            const endpoint = `${API_BASE}/products?${params}`;
+
+            const res = await axios.get(endpoint, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
             const data = res.data.data || [];
-            setVendors(prev => reset ? data : [...prev, ...data]);
+            
+            setProducts(prev => reset ? data : [...prev, ...data]);
+            
             setHasMore(data.length === 10);
-        } catch (_) { }
-        finally { setLoading(false); }
+        } catch (_) { 
+            console.error('Error loading bazar data:', _);
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     useEffect(() => { load(1, true); }, [city]);
 
     const loadMore = () => {
-        if (!hasMore) return;
+        if (!hasMore || loading) return;
         const next = page + 1;
         setPage(next);
         load(next);
     };
 
     const call = (phone) => Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Cannot open dialer'));
+
+    const renderProduct = ({ item: p }) => (
+        <View style={s.card}>
+            <View style={s.cardTop}>
+                <Image 
+                    source={p.images && p.images[0] ? { uri: p.images[0] } : null}
+                    style={s.productImg}
+                />
+                <View style={s.mainInfo}>
+                    <View style={s.shopHeader}>
+                        <Text style={s.shopName} numberOfLines={1}>{p.title}</Text>
+                        <Text style={s.priceTxt}>₹{p.price}</Text>
+                    </View>
+                    <View style={s.locationRow}>
+                        <MaterialCommunityIcons name="store-outline" size={14} color={colors.primary} />
+                        <Text style={s.vendorName} numberOfLines={1}>{p.vendorId?.shopName || p.vendorId?.name || 'Vendor'}</Text>
+                    </View>
+                    <View style={s.locationRow}>
+                        <MaterialCommunityIcons name="map-marker" size={12} color={colors.subText} />
+                        <Text style={s.location}>{p.vendorId?.city || 'Location unavailable'}</Text>
+                    </View>
+                </View>
+            </View>
+            <View style={s.divider} />
+            <View style={s.cardBottom}>
+                <View style={[s.chip, { backgroundColor: colors.iconBg }]}>
+                    <Text style={s.chipTxt}>{p.category}</Text>
+                </View>
+                <TouchableOpacity style={s.callBtn} onPress={() => call(p.vendorId?.phone)} activeOpacity={0.8}>
+                    <LinearGradient 
+                        colors={['#16a34a', '#15803d']} 
+                        style={s.callGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                    >
+                        <MaterialCommunityIcons name="phone" size={16} color="#fff" />
+                        <Text style={s.callTxt}>Call Seller</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 
     return (
         <View style={s.root}>
@@ -57,10 +112,10 @@ export default function BazaarScreen() {
                 <View style={s.headerContent}>
                     <View>
                         <Text style={s.title}>{t.bazar}</Text>
-                        <Text style={s.sub}>Verified scrap vendors nearby</Text>
+                        <Text style={s.sub}>Verified scrap items nearby</Text>
                     </View>
                     <View style={s.headerIcon}>
-                        <MaterialCommunityIcons name="store-search" size={32} color="rgba(255,255,255,0.3)" />
+                        <MaterialCommunityIcons name="package-variant" size={32} color="rgba(255,255,255,0.3)" />
                     </View>
                 </View>
 
@@ -69,7 +124,7 @@ export default function BazaarScreen() {
                     <View style={s.searchBox}>
                         <MaterialCommunityIcons name="magnify" size={20} color={isDarkMode ? '#9ca3af' : '#6b7280'} />
                         <TextInput
-                            style={s.searchInput} placeholder="Search shop name…"
+                            style={s.searchInput} placeholder="Search items…"
                             placeholderTextColor="#9ca3af" value={search}
                             onChangeText={t => { setSearch(t); if (!t) load(1, true); }}
                             onSubmitEditing={() => load(1, true)}
@@ -87,99 +142,32 @@ export default function BazaarScreen() {
                 </View>
             </LinearGradient>
 
-            {loading && page === 1
-                ? (
-                    <View style={s.centerLoader}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={s.loaderText}>Finding vendors...</Text>
-                    </View>
-                ) : (
-                    <FlatList
-                        data={vendors}
-                        keyExtractor={v => v._id}
-                        contentContainerStyle={s.listPadding}
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.4}
-                        ListFooterComponent={hasMore && !loading ? <ActivityIndicator color={colors.primary} /> : null}
-                        ListEmptyComponent={
-                            <View style={s.empty}>
-                                <MaterialCommunityIcons name="store-off-outline" size={64} color={colors.subText} />
-                                <Text style={s.emptyTxt}>No vendors found in this area yet.</Text>
-                                <TouchableOpacity style={s.refreshBtn} onPress={() => load(1, true)}>
-                                    <Text style={s.refreshBtnText}>Refresh</Text>
-                                </TouchableOpacity>
-                            </View>
-                        }
-                        renderItem={({ item: v }) => (
-                            <View style={s.card}>
-                                <View style={s.cardTop}>
-                                    <LinearGradient 
-                                        colors={isDarkMode ? ['#065f46', '#064e3b'] : ['#10b981', '#059669']} 
-                                        style={s.avatar}
-                                    >
-                                        <Text style={s.avatarTxt}>{(v.shopName || v.name || 'V')[0].toUpperCase()}</Text>
-                                    </LinearGradient>
-                                    
-                                    <View style={s.mainInfo}>
-                                        <View style={s.shopHeader}>
-                                            <Text style={s.shopName} numberOfLines={1}>{v.shopName || v.name || 'Vendor'}</Text>
-                                            <View style={s.ratingBadge}>
-                                                <MaterialCommunityIcons name="star" size={14} color="#f59e0b" />
-                                                <Text style={s.ratingTxt}>{v.rating?.toFixed(1) || 'New'}</Text>
-                                            </View>
-                                        </View>
-                                        
-                                        <View style={s.locationRow}>
-                                            <MaterialCommunityIcons name="map-marker" size={12} color={colors.subText} />
-                                            <Text style={s.location}>{v.city || 'Location unavailable'}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                <View style={s.divider} />
-
-                                <View style={s.cardBottom}>
-                                    <View style={s.chipContainer}>
-                                        {v.categories?.length ? (
-                                            v.categories.slice(0, 3).map(c => (
-                                                <View key={c} style={s.chip}>
-                                                    <Text style={s.chipTxt}>{c}</Text>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={s.noCatText}>Multiple categories</Text>
-                                        )}
-                                        {v.categories?.length > 3 && (
-                                            <Text style={s.moreText}>+{v.categories.length - 3} more</Text>
-                                        )}
-                                    </View>
-
-                                    <View style={s.actionRow}>
-                                        {v.kycStatus === 'verified' && (
-                                            <View style={s.verifiedBadge}>
-                                                <MaterialCommunityIcons name="check-decagram" size={14} color={colors.primary} />
-                                                <Text style={s.verifiedTxt}>Verified</Text>
-                                            </View>
-                                        )}
-                                        {v.phone && (
-                                            <TouchableOpacity style={s.callBtn} onPress={() => call(v.phone)} activeOpacity={0.8}>
-                                                <LinearGradient 
-                                                    colors={['#16a34a', '#15803d']} 
-                                                    style={s.callGradient}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 0 }}
-                                                >
-                                                    <MaterialCommunityIcons name="phone" size={16} color="#fff" />
-                                                    <Text style={s.callTxt}>Call</Text>
-                                                </LinearGradient>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                </View>
-                            </View>
-                        )}
-                    />
-                )}
+            {loading && page === 1 ? (
+                <View style={s.centerLoader}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={s.loaderText}>Finding items...</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={products}
+                    keyExtractor={p => p._id}
+                    contentContainerStyle={s.listPadding}
+                    onEndReached={loadMore}
+                    onEndReachedThreshold={0.4}
+                    ListFooterComponent={hasMore && !loading ? <ActivityIndicator color={colors.primary} /> : null}
+                    ListEmptyComponent={
+                        <View style={s.empty}>
+                            <MaterialCommunityIcons name="package-variant-closed" size={64} color={colors.subText} />
+                            <Text style={s.emptyTxt}>No items found in this area yet.</Text>
+                            <TouchableOpacity style={s.refreshBtn} onPress={() => load(1, true)}>
+                                <Text style={s.refreshBtnText}>Refresh</Text>
+                            </TouchableOpacity>
+                        </View>
+                    }
+                    renderItem={renderProduct}
+                />
+            )}
+            }
         </View>
     );
 }
@@ -203,6 +191,32 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     title: { fontSize: 24, fontWeight: '900', color: '#fff' },
     sub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
     
+    toggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 14,
+        padding: 4,
+        marginBottom: 20,
+    },
+    toggleBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    toggleBtnActive: {
+        backgroundColor: '#fff',
+        elevation: 2,
+    },
+    toggleText: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: 'rgba(255,255,255,0.7)',
+    },
+    toggleTextActive: {
+        color: '#16a34a',
+    },
+
     searchRow: { flexDirection: 'row', gap: 10 },
     searchBox: {
         flex: 1, 
@@ -231,7 +245,7 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     centerLoader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     loaderText: { marginTop: 12, color: colors.subText, fontWeight: '600' },
     
-    listPadding: { padding: 16, paddingBottom: 30 },
+    listPadding: { padding: 16, paddingBottom: 110 },
     card: {
         backgroundColor: colors.card, 
         borderRadius: 24, 
@@ -251,11 +265,14 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         elevation: 3,
     },
     avatarTxt: { fontSize: 24, fontWeight: '900', color: '#fff' },
+    productImg: { width: 70, height: 70, borderRadius: 18, backgroundColor: isDark ? '#064e3b' : '#f0fdf4' },
     mainInfo: { flex: 1 },
     shopHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     shopName: { fontSize: 17, fontWeight: '800', color: colors.text, flex: 1, marginRight: 8 },
-    locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
-    location: { fontSize: 13, color: colors.subText, fontWeight: '500' },
+    priceTxt: { fontSize: 17, fontWeight: '900', color: colors.primary },
+    vendorName: { fontSize: 12, fontWeight: '700', color: colors.primary, flex: 1 },
+    locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 4 },
+    location: { fontSize: 12, color: colors.subText, fontWeight: '500' },
     
     ratingBadge: { 
         flexDirection: 'row', 
@@ -318,4 +335,3 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     refreshBtnText: { color: colors.primary, fontWeight: '800' },
 });
-

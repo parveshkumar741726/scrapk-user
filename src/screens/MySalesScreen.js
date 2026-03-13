@@ -297,7 +297,7 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center', justifyContent: 'center',
     },
-    list: { padding: 20, paddingBottom: 40 },
+    list: { padding: 20, paddingBottom: 110 },
     card: {
         borderRadius: 24,
         marginBottom: 16,

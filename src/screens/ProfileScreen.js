@@ -383,7 +383,7 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     langValueBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     langValue: { fontSize: 14, color: colors.primary, fontWeight: '700' },
     
-    footer: { padding: 20, alignItems: 'center', marginTop: 10 },
+    footer: { padding: 20, paddingBottom: 110, alignItems: 'center', marginTop: 10 },
     logoutBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         backgroundColor: colors.error + '10',

@@ -34,8 +34,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "57a42c5a-e8b3-46e4-8737-546aff17eb62"
+        "projectId": "88f3f06f-828c-47df-b8f8-b12074ddc7d5"
       }
-    }
+    },
+    "owner": "parvesh95"
   }
 }

@@ -36,10 +36,10 @@ const getNavigationTheme = (colors, isDark) => ({
 });
 
 const TABS = [
-    { name: 'Home', icon: 'home', label: 'Home' },
-    { name: 'MySales', icon: 'package-variant-closed', label: 'My Sales' },
-    { name: 'Bazaar', icon: 'storefront', label: 'Bazaar' },
-    { name: 'Profile', icon: 'account', label: 'Profile' },
+    { name: 'Home', activeIcon: 'home', inactiveIcon: 'home-outline', label: 'Home' },
+    { name: 'MySales', activeIcon: 'text-box-multiple', inactiveIcon: 'text-box-multiple-outline', label: 'My Sales' },
+    { name: 'Bazaar', activeIcon: 'storefront', inactiveIcon: 'storefront-outline', label: 'Bazaar' },
+    { name: 'Profile', activeIcon: 'account', inactiveIcon: 'account-outline', label: 'Profile' },
 ];
 
 function MainTabs() {
@@ -76,7 +76,7 @@ function MainTabs() {
                 },
                 tabBarIcon: ({ focused, color, size }) => {
                     const t = TABS.find(t => t.name === route.name);
-                    const iconName = focused ? t.icon : `${t.icon}-outline`;
+                    const iconName = focused ? t.activeIcon : t.inactiveIcon;
                     
                     return (
                         <View style={{
